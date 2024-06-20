@@ -39,6 +39,17 @@
             border-radius: 8px;
             background: #f9f9f9;
         }
+        .event-image {
+            max-width: 100%;
+            height: auto;
+            margin-top: 1em;
+            border-radius: 8px;
+        }
+        .countdown {
+            font-size: 1.2em;
+            margin-top: 1em;
+            color: #ff0000;
+        }
         .calendar-container {
             display: flex;
             flex-direction: column;
@@ -92,7 +103,7 @@
             border-radius: 8px;
             background: #f9f9f9;
         }
-        .submit-event input, .submit-event textarea {
+        .submit-event input, .submit-event textarea, .submit-event select {
             width: 100%;
             padding: 0.5em;
             margin: 0.5em 0;
@@ -118,69 +129,72 @@
         const events = {};
         let nextEvent = null;
 
-        async function fetchEvents() {
-            const apiKey = 'AIzaSyAF0YNpQ0Cy6Ohzj9Vrw4p_5aYqz-HnGdA';
-            const sheetId = '1dbOnCGmel3HxC8h2zy66SJKOlC3XTMDeJEh3l2bRnQc';
-            const range = 'Sheet1!A:H'; // Adjust range to include the Approval Status column
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
+async function fetchEvents() {
+    const apiKey = 'AIzaSyAF0YNpQ0Cy6Ohzj9Vrw4p_5aYqz-HnGdA';
+    const sheetId = '1dbOnCGmel3HxC8h2zy66SJKOlC3XTMDeJEh3l2bRnQc';
+    const range = 'Sheet1!A:I'; // Adjust range to include the category and approval status columns
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
 
-            console.log('Fetching data from URL:', url);
+    console.log('Fetching data from URL:', url);
 
-            try {
-                const response = await fetch(url);
-                console.log('Response status:', response.status);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                console.log('Fetched data:', data);
-                processEvents(data.values);
-                displayNextUpcomingEvent();
-            } catch (error) {
-                console.error('Error fetching data:', error);
-                alert('Error fetching data: ' + error.message);
+    try {
+        const response = await fetch(url);
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log('Fetched data:', data);
+        processEvents(data.values);
+        displayNextUpcomingEvent();
+    } catch (error) {
+        console.error('Error fetching data:', error);
+        alert('Error fetching data: ' + error.message);
+    }
+}
+
+function convertDateFormat(dateStr) {
+    const [day, month, year] = dateStr.split('/');
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function processEvents(data) {
+    if (!data || data.length === 0) {
+        console.warn('No data found in the specified range.');
+        return;
+    }
+
+    const today = new Date();
+    data.forEach((row, index) => {
+        if (index === 0) {
+            // Skip header row
+            return;
+        }
+        const [timestamp, name, date, time, location, description, fileUpload, category, status] = row;
+        console.log(`Processing row: ${row}`);
+        if (status && status.trim() === 'Approved') {
+            const formattedDate = convertDateFormat(date);
+            const eventDate = new Date(formattedDate);
+            console.log(`Approved event found: ${name} on ${formattedDate}`);
+            if (!events[formattedDate]) {
+                events[formattedDate] = [];
+            }
+            events[formattedDate].push({ name, time, location, description, fileUpload, category });
+            console.log(`Event added: ${events[formattedDate]}`);
+            
+            if (!nextEvent || (eventDate < new Date(nextEvent.date) && eventDate >= today)) {
+                nextEvent = { date: formattedDate, name, time, location, description, fileUpload, category };
             }
         }
+    });
+    console.log('Processed events:', events);
+    generateCalendar(currentMonth, currentYear);
+}
 
-        function convertDateFormat(dateStr) {
-            const [day, month, year] = dateStr.split('/');
-            return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        }
-
-        function processEvents(data) {
-            if (!data || data.length === 0) {
-                console.warn('No data found in the specified range.');
-                return;
-            }
-
-            const today = new Date();
-            data.forEach((row, index) => {
-                if (index === 0) {
-                    // Skip header row
-                    return;
-                }
-                const [timestamp, name, date, time, location, description, fileUpload, status] = row;
-                console.log(`Processing row: ${row}`);
-                if (status && status.trim() === 'Approved') {
-                    const formattedDate = convertDateFormat(date);
-                    const eventDate = new Date(formattedDate);
-                    console.log(`Approved event found: ${name} on ${formattedDate}`);
-                    if (!events[formattedDate]) {
-                        events[formattedDate] = [];
-                    }
-                    events[formattedDate].push({ name, time, location, description });
-                    console.log(`Event added: ${events[formattedDate]}`);
-                    
-                    if (!nextEvent || (eventDate < new Date(nextEvent.date) && eventDate >= today)) {
-                        nextEvent = { date: formattedDate, name, time, location, description };
-                    }
-                }
-            });
-            generateCalendar(currentMonth, currentYear);
-        }
 
         function displayNextUpcomingEvent() {
             if (nextEvent) {
+                const eventImageHTML = nextEvent.fileUpload ? `<img src="${nextEvent.fileUpload}" alt="Event Image" class="event-image" onerror="this.onerror=null;this.src='fallback-image-url';">` : '';
                 document.getElementById('next-event').innerHTML = `
                     <h2>Next Upcoming Event</h2>
                     <p><strong>Event Name:</strong> ${nextEvent.name}</p>
@@ -188,12 +202,38 @@
                     <p><strong>Time:</strong> ${nextEvent.time}</p>
                     <p><strong>Location:</strong> ${nextEvent.location}</p>
                     <p><strong>Description:</strong> ${nextEvent.description}</p>
+                    <p><strong>Category:</strong> ${nextEvent.category}</p>
+                    ${eventImageHTML}
+                    <div class="countdown" id="countdown"></div>
                 `;
+                startCountdown(nextEvent.date, nextEvent.time);
             } else {
                 document.getElementById('next-event').innerHTML = `
                     <h2>No Upcoming Events</h2>
                 `;
             }
+        }
+
+        function startCountdown(eventDate, eventTime) {
+            const countDownDate = new Date(`${eventDate}T${eventTime}`).getTime();
+            const countdownElement = document.getElementById('countdown');
+            
+            const x = setInterval(function() {
+                const now = new Date().getTime();
+                const distance = countDownDate - now;
+
+                const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+                countdownElement.innerHTML = `Starts in: ${days}d ${hours}h ${minutes}m ${seconds}s`;
+
+                if (distance < 0) {
+                    clearInterval(x);
+                    countdownElement.innerHTML = "Event is ongoing!";
+                }
+            }, 1000);
         }
 
         function generateCalendar(month, year) {
@@ -246,12 +286,17 @@
             const key = `${year}-${formattedMonth}-${formattedDay}`;
             console.log(`Checking events for date: ${key}`);
             if (events[key]) {
-                const eventDetails = events[key].map(event => `
-                    <p><strong>${event.name}</strong></p>
-                    <p>${event.time}</p>
-                    <p>${event.location}</p>
-                    <p>${event.description}</p>
-                `).join('');
+                const eventDetails = events[key].map(event => {
+                    const eventImageHTML = event.fileUpload ? `<img src="${event.fileUpload}" alt="Event Image" class="event-image" onerror="this.onerror=null;this.src='fallback-image-url';">` : '';
+                    return `
+                        <p><strong>${event.name}</strong></p>
+                        <p>${event.time}</p>
+                        <p>${event.location}</p>
+                        <p>${event.description}</p>
+                        <p><strong>Category:</strong> ${event.category}</p>
+                        ${eventImageHTML}
+                    `;
+                }).join('');
                 document.getElementById('next-event').innerHTML = `
                     <h2>Events on ${key}</h2>
                     ${eventDetails}
