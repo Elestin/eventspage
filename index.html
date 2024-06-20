@@ -6,7 +6,7 @@
     <title>Neighborhood Events</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Arial', sans-serif;
             margin: 0;
             padding: 0;
             display: flex;
@@ -86,6 +86,8 @@
             text-align: center;
             cursor: pointer;
             transition: background-color 0.3s ease;
+            position: relative;
+            vertical-align: top;
         }
         .calendar th {
             background-color: #f4f4f9;
@@ -93,10 +95,28 @@
         .calendar td:hover {
             background-color: #e2e2e2;
         }
-        .calendar td.active {
-            background-color: #4CAF50;
-            color: white;
+        .dot-container {
+            margin-top: 5px;
+            display: flex;
+            justify-content: center;
+            gap: 3px;
         }
+        .dot {
+            height: 8px;
+            width: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .dot.community {
+            background-color: purple;
+        }
+        .dot.sports {
+            background-color: green;
+        }
+        .dot.music {
+            background-color: blue;
+        }
+        /* Add more categories as needed */
         .submit-event {
             border: 1px solid #ddd;
             padding: 1em;
@@ -122,6 +142,16 @@
         .submit-event button:hover {
             background-color: #45a049;
         }
+        .search-container {
+            margin-bottom: 2em;
+        }
+        .search-container input {
+            width: 100%;
+            max-width: 300px;
+            padding: 0.5em;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
     </style>
     <script>
         let currentMonth = new Date().getMonth();
@@ -129,68 +159,74 @@
         const events = {};
         let nextEvent = null;
 
-async function fetchEvents() {
-    const apiKey = 'AIzaSyAF0YNpQ0Cy6Ohzj9Vrw4p_5aYqz-HnGdA';
-    const sheetId = '1dbOnCGmel3HxC8h2zy66SJKOlC3XTMDeJEh3l2bRnQc';
-    const range = 'Sheet1!A:I'; // Adjust range to include the category and approval status columns
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
+        const categoryColors = {
+            "Community": "purple",
+            "Sports": "green",
+            "Music": "blue",
+            // Add more categories and colors as needed
+        };
 
-    console.log('Fetching data from URL:', url);
+        async function fetchEvents() {
+            const apiKey = 'AIzaSyAF0YNpQ0Cy6Ohzj9Vrw4p_5aYqz-HnGdA';
+            const sheetId = '1dbOnCGmel3HxC8h2zy66SJKOlC3XTMDeJEh3l2bRnQc';
+            const range = 'Sheet1!A:I'; // Adjust range to include the category and approval status columns
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
 
-    try {
-        const response = await fetch(url);
-        console.log('Response status:', response.status);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        console.log('Fetched data:', data);
-        processEvents(data.values);
-        displayNextUpcomingEvent();
-    } catch (error) {
-        console.error('Error fetching data:', error);
-        alert('Error fetching data: ' + error.message);
-    }
-}
+            console.log('Fetching data from URL:', url);
 
-function convertDateFormat(dateStr) {
-    const [day, month, year] = dateStr.split('/');
-    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-}
-
-function processEvents(data) {
-    if (!data || data.length === 0) {
-        console.warn('No data found in the specified range.');
-        return;
-    }
-
-    const today = new Date();
-    data.forEach((row, index) => {
-        if (index === 0) {
-            // Skip header row
-            return;
-        }
-        const [timestamp, name, date, time, location, description, fileUpload, category, status] = row;
-        console.log(`Processing row: ${row}`);
-        if (status && status.trim() === 'Approved') {
-            const formattedDate = convertDateFormat(date);
-            const eventDate = new Date(formattedDate);
-            console.log(`Approved event found: ${name} on ${formattedDate}`);
-            if (!events[formattedDate]) {
-                events[formattedDate] = [];
-            }
-            events[formattedDate].push({ name, time, location, description, fileUpload, category });
-            console.log(`Event added: ${events[formattedDate]}`);
-            
-            if (!nextEvent || (eventDate < new Date(nextEvent.date) && eventDate >= today)) {
-                nextEvent = { date: formattedDate, name, time, location, description, fileUpload, category };
+            try {
+                const response = await fetch(url);
+                console.log('Response status:', response.status);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                console.log('Fetched data:', data);
+                processEvents(data.values);
+                displayNextUpcomingEvent();
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                alert('Error fetching data: ' + error.message);
             }
         }
-    });
-    console.log('Processed events:', events);
-    generateCalendar(currentMonth, currentYear);
-}
 
+        function convertDateFormat(dateStr) {
+            const [day, month, year] = dateStr.split('/');
+            return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        }
+
+        function processEvents(data) {
+            if (!data || data.length === 0) {
+                console.warn('No data found in the specified range.');
+                return;
+            }
+
+            const today = new Date();
+            data.forEach((row, index) => {
+                if (index === 0) {
+                    // Skip header row
+                    return;
+                }
+                const [timestamp, name, date, time, location, description, fileUpload, category, status] = row;
+                console.log(`Processing row: ${row}`);
+                if (status && status.trim() === 'Approved') {
+                    const formattedDate = convertDateFormat(date);
+                    const eventDate = new Date(formattedDate);
+                    console.log(`Approved event found: ${name} on ${formattedDate}`);
+                    if (!events[formattedDate]) {
+                        events[formattedDate] = [];
+                    }
+                    events[formattedDate].push({ name, time, location, description, fileUpload, category });
+                    console.log(`Event added: ${events[formattedDate]}`);
+                    
+                    if (!nextEvent || (eventDate < new Date(nextEvent.date) && eventDate >= today)) {
+                        nextEvent = { date: formattedDate, name, time, location, description, fileUpload, category };
+                    }
+                }
+            });
+            console.log('Processed events:', events);
+            generateCalendar(currentMonth, currentYear);
+        }
 
         function displayNextUpcomingEvent() {
             if (nextEvent) {
@@ -265,13 +301,22 @@ function processEvents(data) {
                         cell.onclick = () => showEvents(day, month, year);
                         const cellText = document.createTextNode(date);
                         cell.appendChild(cellText);
-                        row.appendChild(cell);
 
                         const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
                         if (events[key]) {
-                            console.log(`Event exists for date: ${key}`);
-                            cell.classList.add('active');
+                            const dotContainer = document.createElement('div');
+                            dotContainer.classList.add('dot-container');
+                            const eventCategories = events[key].map(event => event.category);
+                            const uniqueCategories = [...new Set(eventCategories)];
+                            uniqueCategories.forEach((category) => {
+                                const dot = document.createElement('span');
+                                dot.classList.add('dot');
+                                dot.classList.add(category.toLowerCase());
+                                dotContainer.appendChild(dot);
+                            });
+                            cell.appendChild(dotContainer);
                         }
+                        row.appendChild(cell);
                         date++;
                     }
                 }
@@ -320,8 +365,58 @@ function processEvents(data) {
             generateCalendar(currentMonth, currentYear);
         }
 
+        function searchEvents(query) {
+            const searchResults = document.getElementById('next-event');
+            const results = [];
+            for (const date in events) {
+                events[date].forEach(event => {
+                    if (event.name.toLowerCase().includes(query.toLowerCase()) ||
+                        event.category.toLowerCase().includes(query.toLowerCase()) ||
+                        event.description.toLowerCase().includes(query.toLowerCase()) ||
+                        event.location.toLowerCase().includes(query.toLowerCase())) {
+                        results.push({
+                            date,
+                            ...event
+                        });
+                    }
+                });
+            }
+
+            if (results.length > 0) {
+                const eventDetails = results.map(event => {
+                    const eventImageHTML = event.fileUpload ? `<img src="${event.fileUpload}" alt="Event Image" class="event-image" onerror="this.onerror=null;this.src='fallback-image-url';">` : '';
+                    return `
+                        <p><strong>${event.name}</strong></p>
+                        <p>${event.date}</p>
+                        <p>${event.time}</p>
+                        <p>${event.location}</p>
+                        <p>${event.description}</p>
+                        <p><strong>Category:</strong> ${event.category}</p>
+                        ${eventImageHTML}
+                    `;
+                }).join('');
+                searchResults.innerHTML = `
+                    <h2>Search Results</h2>
+                    ${eventDetails}
+                `;
+            } else {
+                searchResults.innerHTML = `
+                    <h2>No Events Found</h2>
+                `;
+            }
+        }
+
         window.onload = function() {
             fetchEvents();
+            const searchInput = document.getElementById('search-input');
+            searchInput.addEventListener('input', function() {
+                if (this.value === "") {
+                    document.getElementById('next-event').innerHTML = `<h2>Next Upcoming Event</h2>`;
+                    displayNextUpcomingEvent();
+                } else {
+                    searchEvents(this.value);
+                }
+            });
         };
     </script>
 </head>
@@ -330,6 +425,9 @@ function processEvents(data) {
         <h1>Neighborhood Events</h1>
     </header>
     <div class="content">
+        <div class="search-container">
+            <input type="text" id="search-input" placeholder="Search events by name, category, location, or description...">
+        </div>
         <div class="upcoming-event" id="next-event">
             <h2>Next Upcoming Event</h2>
             <p>Loading...</p>
